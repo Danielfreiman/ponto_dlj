@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+:root {
+  --roxo: #7B2D6E;
+  --roxo-escuro: #5a1f50;
+  --roxo-claro: #9b4a8c;
+  --bege: #F5DEB3;
+  --bege-escuro: #e8c98a;
+}
+
+body {
+  background-color: #F5DEB3;
+  color: #5a1f50;
+  font-family: 'Segoe UI', Helvetica, sans-serif;
+}
