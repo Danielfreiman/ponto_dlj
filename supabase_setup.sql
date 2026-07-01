@@ -1,4 +1,5 @@
 -- Execute este SQL no Supabase > SQL Editor
+-- Este script pode ser executado quantas vezes for necessário (idempotente).
 
 -- Tabela de marcações de ponto
 create table if not exists public.marcacoes (
@@ -15,6 +16,14 @@ create index if not exists marcacoes_created_at_idx on public.marcacoes(created_
 
 -- RLS (Row Level Security)
 alter table public.marcacoes enable row level security;
+
+-- Remove policies antigas antes de recriar
+drop policy if exists "colaborador_select" on public.marcacoes;
+drop policy if exists "colaborador_insert" on public.marcacoes;
+drop policy if exists "master_select_all" on public.marcacoes;
+drop policy if exists "master_insert_all" on public.marcacoes;
+drop policy if exists "master_update_all" on public.marcacoes;
+drop policy if exists "master_delete_all" on public.marcacoes;
 
 -- Colaborador pode ver e inserir apenas suas próprias marcações
 create policy "colaborador_select" on public.marcacoes
