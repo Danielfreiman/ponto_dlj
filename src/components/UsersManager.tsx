@@ -21,13 +21,20 @@ export default function UsersManager({ onChange }: Props) {
   const [password, setPassword] = useState('')
   const [criando, setCriando] = useState(false)
   const [erro, setErro] = useState('')
+  const [erroLista, setErroLista] = useState('')
   const [excluindo, setExcluindo] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
     setLoading(true)
+    setErroLista('')
     const res = await fetch('/api/admin/users')
     const data = await res.json()
-    setUsuarios(data.usuarios || [])
+    if (!res.ok) {
+      setErroLista(data.error || 'Erro ao carregar colaboradores.')
+      setUsuarios([])
+    } else {
+      setUsuarios(data.usuarios || [])
+    }
     setLoading(false)
     onChange?.()
   }, [onChange])
@@ -111,6 +118,8 @@ export default function UsersManager({ onChange }: Props) {
 
         {loading ? (
           <p className="text-center text-zinc-400 text-sm py-8">Carregando...</p>
+        ) : erroLista ? (
+          <p className="text-center text-red-500 text-sm py-8">{erroLista}</p>
         ) : usuarios.length === 0 ? (
           <p className="text-center text-zinc-400 text-sm py-8">Nenhum colaborador cadastrado.</p>
         ) : (

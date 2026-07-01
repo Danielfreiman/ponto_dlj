@@ -32,23 +32,25 @@ create policy "colaborador_select" on public.marcacoes
 create policy "colaborador_insert" on public.marcacoes
   for insert with check (auth.uid() = user_id);
 
--- Master (danifreiman44@gmail.com) pode ver, inserir, editar e excluir tudo
+-- Master (danifreiman44@gmail.com) pode ver, inserir, editar e excluir tudo.
+-- Usa auth.jwt() (claims do token) em vez de consultar auth.users diretamente,
+-- pois o papel "authenticated" não tem permissão de SELECT em auth.users.
 create policy "master_select_all" on public.marcacoes
   for select using (
-    (select email from auth.users where id = auth.uid()) = 'danifreiman44@gmail.com'
+    (auth.jwt() ->> 'email') = 'danifreiman44@gmail.com'
   );
 
 create policy "master_insert_all" on public.marcacoes
   for insert with check (
-    (select email from auth.users where id = auth.uid()) = 'danifreiman44@gmail.com'
+    (auth.jwt() ->> 'email') = 'danifreiman44@gmail.com'
   );
 
 create policy "master_update_all" on public.marcacoes
   for update using (
-    (select email from auth.users where id = auth.uid()) = 'danifreiman44@gmail.com'
+    (auth.jwt() ->> 'email') = 'danifreiman44@gmail.com'
   );
 
 create policy "master_delete_all" on public.marcacoes
   for delete using (
-    (select email from auth.users where id = auth.uid()) = 'danifreiman44@gmail.com'
+    (auth.jwt() ->> 'email') = 'danifreiman44@gmail.com'
   );
