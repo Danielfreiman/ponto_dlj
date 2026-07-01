@@ -38,8 +38,13 @@ export default function MasterDashboard({ user }: { user: User }) {
   const [marcacaoEditando, setMarcacaoEditando] = useState<Marcacao | null>(null)
   const supabase = createClient()
 
+  const mesInicio = useCallback(() => {
+    const [ano, mesNum] = mes.split('-').map(Number)
+    return new Date(ano, mesNum - 1, 1)
+  }, [mes])
+
   const carregarDados = useCallback(async () => {
-    const inicio = startOfMonth(new Date(mes + '-01'))
+    const inicio = startOfMonth(mesInicio())
     const fim = endOfMonth(inicio)
     const { data } = await supabase
       .from('marcacoes')
@@ -48,7 +53,7 @@ export default function MasterDashboard({ user }: { user: User }) {
       .lte('created_at', fim.toISOString())
       .order('created_at', { ascending: true })
     setMarcacoes((data as Marcacao[]) || [])
-  }, [supabase, mes])
+  }, [supabase, mesInicio])
 
   const carregarUsuarios = useCallback(async () => {
     const res = await fetch('/api/admin/users')
@@ -164,7 +169,7 @@ export default function MasterDashboard({ user }: { user: User }) {
           <div>
             <h1 className="text-lg font-semibold text-zinc-800">Relatórios de Ponto</h1>
             <p className="text-sm text-zinc-500">
-              {format(new Date(mes + '-01'), "MMMM 'de' yyyy", { locale: ptBR })}
+              {format(mesInicio(), "MMMM 'de' yyyy", { locale: ptBR })}
             </p>
           </div>
           <div className="flex items-center gap-2">
