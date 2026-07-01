@@ -31,59 +31,65 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#F5DEB3' }}>
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#f4f4f5' }}>
       <div className="w-full max-w-sm">
+
+        {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <Image src="/logo.png" alt="Zé do Açaí" width={160} height={160} priority />
-          <h1 className="text-2xl font-bold mt-4" style={{ color: '#7B2D6E' }}>
-            Sistema de Ponto
-          </h1>
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-sm mb-4" style={{ background: '#18181b' }}>
+            <Image src="/logo.png" alt="Zé do Açaí" width={56} height={56} priority />
+          </div>
+          <h1 className="text-xl font-bold text-zinc-800">Sistema de Ponto</h1>
+          <p className="text-sm text-zinc-500 mt-1">Zé do Açaí</p>
         </div>
 
-        <form onSubmit={handleLogin} className="rounded-2xl shadow-lg p-8 flex flex-col gap-4" style={{ background: '#fff' }}>
-          <div>
-            <label className="block text-sm font-semibold mb-1" style={{ color: '#7B2D6E' }}>
-              E-mail
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="w-full border-2 rounded-lg px-3 py-2 outline-none focus:border-[#7B2D6E] transition-colors"
-              style={{ borderColor: '#e8c98a', color: '#5a1f50' }}
-              placeholder="seu@email.com"
-            />
-          </div>
+        {/* Card */}
+        <div className="rounded-2xl border shadow-sm p-8 flex flex-col gap-5" style={{ background: '#ffffff', borderColor: '#e4e4e7' }}>
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1.5">E-mail</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none transition-colors text-zinc-800 placeholder-zinc-400"
+                style={{ borderColor: '#e4e4e7', background: '#fafafa' }}
+                onFocus={e => e.target.style.borderColor = '#7B2D6E'}
+                onBlur={e => e.target.style.borderColor = '#e4e4e7'}
+                placeholder="seu@email.com"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-semibold mb-1" style={{ color: '#7B2D6E' }}>
-              Senha
-            </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full border-2 rounded-lg px-3 py-2 outline-none focus:border-[#7B2D6E] transition-colors"
-              style={{ borderColor: '#e8c98a', color: '#5a1f50' }}
-              placeholder="••••••••"
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 mb-1.5">Senha</label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2.5 text-sm outline-none transition-colors text-zinc-800 placeholder-zinc-400"
+                style={{ borderColor: '#e4e4e7', background: '#fafafa' }}
+                onFocus={e => e.target.style.borderColor = '#7B2D6E'}
+                onBlur={e => e.target.style.borderColor = '#e4e4e7'}
+                placeholder="••••••••"
+              />
+            </div>
 
-          {error && (
-            <p className="text-sm text-red-600 text-center">{error}</p>
-          )}
+            {error && (
+              <p className="text-sm text-red-500 text-center">{error}</p>
+            )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 py-3 rounded-xl font-bold text-white transition-opacity disabled:opacity-60 cursor-pointer"
-            style={{ background: '#7B2D6E' }}
-          >
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="mt-1 py-2.5 rounded-lg font-semibold text-sm text-white transition-opacity disabled:opacity-60 cursor-pointer"
+              style={{ background: '#7B2D6E' }}
+            >
+              {loading ? 'Entrando...' : 'Entrar'}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   )

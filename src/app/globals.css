@@ -3,13 +3,20 @@
 :root {
   --roxo: #7B2D6E;
   --roxo-escuro: #5a1f50;
-  --roxo-claro: #9b4a8c;
   --bege: #F5DEB3;
   --bege-escuro: #e8c98a;
+
+  --bg: #f4f4f5;
+  --surface: #ffffff;
+  --surface-2: #fafafa;
+  --border: #e4e4e7;
+  --text: #18181b;
+  --text-muted: #71717a;
+  --header-bg: #18181b;
 }
 
 body {
-  background-color: #F5DEB3;
-  color: #5a1f50;
+  background-color: var(--bg);
+  color: var(--text);
   font-family: 'Segoe UI', Helvetica, sans-serif;
 }
