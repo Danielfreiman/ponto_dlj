@@ -23,8 +23,23 @@ create policy "colaborador_select" on public.marcacoes
 create policy "colaborador_insert" on public.marcacoes
   for insert with check (auth.uid() = user_id);
 
--- Master (danifreiman44@gmail.com) pode ver tudo
+-- Master (danifreiman44@gmail.com) pode ver, inserir, editar e excluir tudo
 create policy "master_select_all" on public.marcacoes
   for select using (
+    (select email from auth.users where id = auth.uid()) = 'danifreiman44@gmail.com'
+  );
+
+create policy "master_insert_all" on public.marcacoes
+  for insert with check (
+    (select email from auth.users where id = auth.uid()) = 'danifreiman44@gmail.com'
+  );
+
+create policy "master_update_all" on public.marcacoes
+  for update using (
+    (select email from auth.users where id = auth.uid()) = 'danifreiman44@gmail.com'
+  );
+
+create policy "master_delete_all" on public.marcacoes
+  for delete using (
     (select email from auth.users where id = auth.uid()) = 'danifreiman44@gmail.com'
   );

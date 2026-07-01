@@ -6,6 +6,8 @@ import { format, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { User } from '@supabase/supabase-js'
 import Header from './Header'
+import UsersManager from './UsersManager'
+import MarcacaoModal from './MarcacaoModal'
 
 interface Marcacao {
   id: string
@@ -13,6 +15,11 @@ interface Marcacao {
   email: string
   tipo: 'entrada' | 'saida'
   created_at: string
+}
+
+interface Usuario {
+  id: string
+  email: string
 }
 
 interface ColaboradorResumo {
@@ -25,7 +32,10 @@ interface ColaboradorResumo {
 export default function MasterDashboard({ user }: { user: User }) {
   const [mes, setMes] = useState(format(new Date(), 'yyyy-MM'))
   const [marcacoes, setMarcacoes] = useState<Marcacao[]>([])
-  const [aba, setAba] = useState<'resumo' | 'detalhado'>('resumo')
+  const [usuarios, setUsuarios] = useState<Usuario[]>([])
+  const [aba, setAba] = useState<'resumo' | 'detalhado' | 'usuarios'>('resumo')
+  const [modalAberto, setModalAberto] = useState(false)
+  const [marcacaoEditando, setMarcacaoEditando] = useState<Marcacao | null>(null)
   const supabase = createClient()
 
   const carregarDados = useCallback(async () => {
@@ -40,7 +50,14 @@ export default function MasterDashboard({ user }: { user: User }) {
     setMarcacoes((data as Marcacao[]) || [])
   }, [supabase, mes])
 
+  const carregarUsuarios = useCallback(async () => {
+    const res = await fetch('/api/admin/users')
+    const data = await res.json()
+    setUsuarios(data.usuarios || [])
+  }, [])
+
   useEffect(() => { carregarDados() }, [carregarDados])
+  useEffect(() => { carregarUsuarios() }, [carregarUsuarios])
 
   function calcularResumos(): ColaboradorResumo[] {
     const porEmail: Record<string, Marcacao[]> = {}
@@ -95,6 +112,47 @@ export default function MasterDashboard({ user }: { user: User }) {
     a.click()
   }
 
+  function abrirNovaMarcacao() {
+    setMarcacaoEditando(null)
+    setModalAberto(true)
+  }
+
+  function abrirEdicao(m: Marcacao) {
+    setMarcacaoEditando(m)
+    setModalAberto(true)
+  }
+
+  async function handleSalvarMarcacao(dados: {
+    id?: string
+    user_id: string
+    email: string
+    tipo: 'entrada' | 'saida'
+    created_at: string
+  }) {
+    if (dados.id) {
+      await supabase
+        .from('marcacoes')
+        .update({ user_id: dados.user_id, email: dados.email, tipo: dados.tipo, created_at: dados.created_at })
+        .eq('id', dados.id)
+    } else {
+      await supabase.from('marcacoes').insert({
+        user_id: dados.user_id,
+        email: dados.email,
+        tipo: dados.tipo,
+        created_at: dados.created_at,
+      })
+    }
+    setModalAberto(false)
+    setMarcacaoEditando(null)
+    await carregarDados()
+  }
+
+  async function handleExcluirMarcacao(id: string) {
+    if (!confirm('Excluir esta marcação?')) return
+    await supabase.from('marcacoes').delete().eq('id', id)
+    await carregarDados()
+  }
+
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#f4f4f5' }}>
       <Header email={user.email!} role="master" />
@@ -118,6 +176,13 @@ export default function MasterDashboard({ user }: { user: User }) {
               style={{ borderColor: '#e4e4e7', background: '#ffffff' }}
             />
             <button
+              onClick={abrirNovaMarcacao}
+              className="px-4 py-2 rounded-lg text-sm font-medium border cursor-pointer"
+              style={{ borderColor: '#7B2D6E', color: '#7B2D6E' }}
+            >
+              Nova marcação
+            </button>
+            <button
               onClick={exportarCSV}
               className="px-4 py-2 rounded-lg text-sm font-medium text-white cursor-pointer"
               style={{ background: '#7B2D6E' }}
@@ -129,7 +194,7 @@ export default function MasterDashboard({ user }: { user: User }) {
 
         {/* Abas */}
         <div className="flex gap-1 mb-4 border-b" style={{ borderColor: '#e4e4e7' }}>
-          {(['resumo', 'detalhado'] as const).map(a => (
+          {(['resumo', 'detalhado', 'usuarios'] as const).map(a => (
             <button
               key={a}
               onClick={() => setAba(a)}
@@ -140,7 +205,7 @@ export default function MasterDashboard({ user }: { user: User }) {
                 marginBottom: '-1px',
               }}
             >
-              {a === 'resumo' ? 'Resumo Mensal' : 'Detalhado'}
+              {a === 'resumo' ? 'Resumo Mensal' : a === 'detalhado' ? 'Detalhado' : 'Usuários'}
             </button>
           ))}
         </div>
@@ -185,12 +250,13 @@ export default function MasterDashboard({ user }: { user: User }) {
                     <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Tipo</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Data</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Hora</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold text-zinc-500 uppercase tracking-wider">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: '#f4f4f5' }}>
                   {marcacoes.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="text-center py-10 text-zinc-400 text-sm">
+                      <td colSpan={5} className="text-center py-10 text-zinc-400 text-sm">
                         Nenhuma marcação no período.
                       </td>
                     </tr>
@@ -215,6 +281,24 @@ export default function MasterDashboard({ user }: { user: User }) {
                       <td className="px-5 py-3 text-zinc-500 font-mono text-xs">
                         {format(new Date(m.created_at), 'HH:mm:ss')}
                       </td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => abrirEdicao(m)}
+                            className="text-xs font-medium px-2.5 py-1 rounded-lg border cursor-pointer"
+                            style={{ borderColor: '#e4e4e7', color: '#52525b' }}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleExcluirMarcacao(m.id)}
+                            className="text-xs font-medium px-2.5 py-1 rounded-lg border cursor-pointer"
+                            style={{ borderColor: '#fecaca', color: '#b91c1c' }}
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -222,7 +306,19 @@ export default function MasterDashboard({ user }: { user: User }) {
             </div>
           </div>
         )}
+
+        {/* Usuários */}
+        {aba === 'usuarios' && <UsersManager onChange={carregarUsuarios} />}
       </main>
+
+      {modalAberto && (
+        <MarcacaoModal
+          usuarios={usuarios}
+          marcacao={marcacaoEditando}
+          onClose={() => { setModalAberto(false); setMarcacaoEditando(null) }}
+          onSalvar={handleSalvarMarcacao}
+        />
+      )}
     </div>
   )
 }
