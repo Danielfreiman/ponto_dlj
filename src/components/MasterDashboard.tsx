@@ -29,6 +29,13 @@ interface ColaboradorResumo {
   marcacoes: Marcacao[]
 }
 
+interface GrupoDia {
+  email: string
+  dia: string
+  entrada?: Marcacao
+  saida?: Marcacao
+}
+
 export default function MasterDashboard({ user }: { user: User }) {
   const [mes, setMes] = useState(format(new Date(), 'yyyy-MM'))
   const [marcacoes, setMarcacoes] = useState<Marcacao[]>([])
@@ -96,6 +103,47 @@ export default function MasterDashboard({ user }: { user: User }) {
   }
 
   const resumos = calcularResumos()
+
+  function agruparDetalhado(): GrupoDia[] {
+    const porEmailDia: Record<string, Marcacao[]> = {}
+    for (const m of marcacoes) {
+      const dia = format(new Date(m.created_at), 'yyyy-MM-dd')
+      const chave = `${m.email}|${dia}`
+      if (!porEmailDia[chave]) porEmailDia[chave] = []
+      porEmailDia[chave].push(m)
+    }
+
+    const grupos: GrupoDia[] = []
+    for (const chave of Object.keys(porEmailDia)) {
+      const [email, dia] = chave.split('|')
+      const lista = [...porEmailDia[chave]].sort((a, b) => a.created_at.localeCompare(b.created_at))
+      let i = 0
+      while (i < lista.length) {
+        if (lista[i].tipo === 'entrada') {
+          if (i + 1 < lista.length && lista[i + 1].tipo === 'saida') {
+            grupos.push({ email, dia, entrada: lista[i], saida: lista[i + 1] })
+            i += 2
+          } else {
+            grupos.push({ email, dia, entrada: lista[i] })
+            i += 1
+          }
+        } else {
+          grupos.push({ email, dia, saida: lista[i] })
+          i += 1
+        }
+      }
+    }
+
+    grupos.sort((a, b) => {
+      const chaveA = `${a.dia}|${a.email}|${(a.entrada ?? a.saida)!.created_at}`
+      const chaveB = `${b.dia}|${b.email}|${(b.entrada ?? b.saida)!.created_at}`
+      return chaveA.localeCompare(chaveB)
+    })
+
+    return grupos
+  }
+
+  const detalhado = agruparDetalhado()
 
   function formatarHoras(min: number) {
     const h = Math.floor(min / 60)
@@ -252,60 +300,94 @@ export default function MasterDashboard({ user }: { user: User }) {
                 <thead>
                   <tr style={{ background: '#fafafa', borderBottom: '1px solid #e4e4e7' }}>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Colaborador</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Tipo</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Data</th>
-                    <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Hora</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Entrada</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Saída</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Horas</th>
                     <th className="px-5 py-3 text-right text-xs font-semibold text-zinc-500 uppercase tracking-wider">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: '#f4f4f5' }}>
-                  {marcacoes.length === 0 ? (
+                  {detalhado.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="text-center py-10 text-zinc-400 text-sm">
+                      <td colSpan={6} className="text-center py-10 text-zinc-400 text-sm">
                         Nenhuma marcação no período.
                       </td>
                     </tr>
-                  ) : marcacoes.map((m) => (
-                    <tr key={m.id} className="hover:bg-zinc-50 transition-colors">
-                      <td className="px-5 py-3 text-zinc-700 truncate max-w-[200px]">{m.email}</td>
-                      <td className="px-5 py-3">
-                        <span
-                          className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                          style={
-                            m.tipo === 'entrada'
-                              ? { background: '#f0fdf4', color: '#15803d' }
-                              : { background: '#fef2f2', color: '#b91c1c' }
-                          }
-                        >
-                          {m.tipo === 'entrada' ? 'Entrada' : 'Saída'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-zinc-500">
-                        {format(new Date(m.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                      </td>
-                      <td className="px-5 py-3 text-zinc-500 font-mono text-xs">
-                        {format(new Date(m.created_at), 'HH:mm:ss')}
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => abrirEdicao(m)}
-                            className="text-xs font-medium px-2.5 py-1 rounded-lg border cursor-pointer"
-                            style={{ borderColor: '#e4e4e7', color: '#52525b' }}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleExcluirMarcacao(m.id)}
-                            className="text-xs font-medium px-2.5 py-1 rounded-lg border cursor-pointer"
-                            style={{ borderColor: '#fecaca', color: '#b91c1c' }}
-                          >
-                            Excluir
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  ) : detalhado.map((g, idx) => {
+                    const horas = g.entrada && g.saida
+                      ? formatarHoras(differenceInMinutes(new Date(g.saida.created_at), new Date(g.entrada.created_at)))
+                      : '-'
+                    return (
+                      <tr key={`${g.email}-${g.dia}-${idx}`} className="hover:bg-zinc-50 transition-colors">
+                        <td className="px-5 py-3 text-zinc-700 truncate max-w-[200px]">{g.email}</td>
+                        <td className="px-5 py-3 text-zinc-500">
+                          {format(new Date(g.dia + 'T00:00:00'), "dd/MM/yyyy", { locale: ptBR })}
+                        </td>
+                        <td className="px-5 py-3">
+                          {g.entrada ? (
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-zinc-600">
+                                {format(new Date(g.entrada.created_at), 'HH:mm:ss')}
+                              </span>
+                              <button
+                                onClick={() => abrirEdicao(g.entrada!)}
+                                className="text-xs px-1.5 py-0.5 rounded border cursor-pointer"
+                                style={{ borderColor: '#e4e4e7', color: '#52525b' }}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => handleExcluirMarcacao(g.entrada!.id)}
+                                className="text-xs px-1.5 py-0.5 rounded border cursor-pointer"
+                                style={{ borderColor: '#fecaca', color: '#b91c1c' }}
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-zinc-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3">
+                          {g.saida ? (
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-zinc-600">
+                                {format(new Date(g.saida.created_at), 'HH:mm:ss')}
+                              </span>
+                              <button
+                                onClick={() => abrirEdicao(g.saida!)}
+                                className="text-xs px-1.5 py-0.5 rounded border cursor-pointer"
+                                style={{ borderColor: '#e4e4e7', color: '#52525b' }}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                onClick={() => handleExcluirMarcacao(g.saida!.id)}
+                                className="text-xs px-1.5 py-0.5 rounded border cursor-pointer"
+                                style={{ borderColor: '#fecaca', color: '#b91c1c' }}
+                              >
+                                Excluir
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-zinc-300 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 text-zinc-700 font-medium">{horas}</td>
+                        <td className="px-5 py-3 text-right">
+                          {!g.entrada || !g.saida ? (
+                            <span
+                              className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                              style={{ background: '#fef9c3', color: '#854d0e' }}
+                            >
+                              Incompleto
+                            </span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
