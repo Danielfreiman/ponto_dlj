@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { format } from 'date-fns'
+import { format, startOfDay, endOfDay } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { User } from '@supabase/supabase-js'
 import Header from './Header'
@@ -20,18 +20,18 @@ export default function ColaboradorDashboard({ user }: { user: User }) {
   const [agora, setAgora] = useState(new Date())
   const supabase = createClient()
 
-  const hoje = format(new Date(), 'yyyy-MM-dd')
-
   const carregarMarcacoes = useCallback(async () => {
+    const inicio = startOfDay(new Date())
+    const fim = endOfDay(new Date())
     const { data } = await supabase
       .from('marcacoes')
       .select('*')
       .eq('user_id', user.id)
-      .gte('created_at', `${hoje}T00:00:00`)
-      .lte('created_at', `${hoje}T23:59:59`)
+      .gte('created_at', inicio.toISOString())
+      .lte('created_at', fim.toISOString())
       .order('created_at', { ascending: true })
     setMarcacoes((data as Marcacao[]) || [])
-  }, [supabase, user.id, hoje])
+  }, [supabase, user.id])
 
   useEffect(() => {
     carregarMarcacoes()
