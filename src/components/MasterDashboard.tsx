@@ -41,6 +41,7 @@ export default function MasterDashboard({ user }: { user: User }) {
   const [marcacoes, setMarcacoes] = useState<Marcacao[]>([])
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [aba, setAba] = useState<'resumo' | 'detalhado' | 'usuarios'>('resumo')
+  const [filtroEmail, setFiltroEmail] = useState('')
   const [modalAberto, setModalAberto] = useState(false)
   const [marcacaoEditando, setMarcacaoEditando] = useState<Marcacao | null>(null)
   const supabase = createClient()
@@ -144,6 +145,9 @@ export default function MasterDashboard({ user }: { user: User }) {
   }
 
   const detalhado = agruparDetalhado()
+  const detalhadoFiltrado = filtroEmail ? detalhado.filter(g => g.email === filtroEmail) : detalhado
+
+  const emailsDisponiveis = Array.from(new Set(marcacoes.map(m => m.email))).sort()
 
   function formatarHoras(min: number) {
     const h = Math.floor(min / 60)
@@ -295,6 +299,20 @@ export default function MasterDashboard({ user }: { user: User }) {
         {/* Detalhado */}
         {aba === 'detalhado' && (
           <div className="rounded-2xl border overflow-hidden" style={{ background: '#ffffff', borderColor: '#e4e4e7' }}>
+            <div className="px-5 py-3 border-b flex items-center gap-2" style={{ borderColor: '#e4e4e7', background: '#fafafa' }}>
+              <label className="text-xs font-medium text-zinc-500">Filtrar por colaborador</label>
+              <select
+                value={filtroEmail}
+                onChange={e => setFiltroEmail(e.target.value)}
+                className="border rounded-lg px-3 py-1.5 text-sm text-zinc-700 outline-none"
+                style={{ borderColor: '#e4e4e7', background: '#ffffff' }}
+              >
+                <option value="">Todos</option>
+                {emailsDisponiveis.map(email => (
+                  <option key={email} value={email}>{email}</option>
+                ))}
+              </select>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -308,13 +326,13 @@ export default function MasterDashboard({ user }: { user: User }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: '#f4f4f5' }}>
-                  {detalhado.length === 0 ? (
+                  {detalhadoFiltrado.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="text-center py-10 text-zinc-400 text-sm">
-                        Nenhuma marcação no período.
+                        {filtroEmail ? 'Nenhuma marcação para este colaborador no período.' : 'Nenhuma marcação no período.'}
                       </td>
                     </tr>
-                  ) : detalhado.map((g, idx) => {
+                  ) : detalhadoFiltrado.map((g, idx) => {
                     const horas = g.entrada && g.saida
                       ? formatarHoras(differenceInMinutes(new Date(g.saida.created_at), new Date(g.entrada.created_at)))
                       : '-'
