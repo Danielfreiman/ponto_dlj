@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { format, startOfDay, endOfDay } from 'date-fns'
+import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, differenceInMinutes } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { User } from '@supabase/supabase-js'
 import Header from './Header'
@@ -15,6 +15,7 @@ interface Marcacao {
 
 export default function ColaboradorDashboard({ user }: { user: User }) {
   const [marcacoes, setMarcacoes] = useState<Marcacao[]>([])
+  const [marcacoesMes, setMarcacoesMes] = useState<Marcacao[]>([])
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState('')
   const [agora, setAgora] = useState(new Date())
@@ -33,11 +34,25 @@ export default function ColaboradorDashboard({ user }: { user: User }) {
     setMarcacoes((data as Marcacao[]) || [])
   }, [supabase, user.id])
 
+  const carregarMarcacoesMes = useCallback(async () => {
+    const inicioMes = startOfMonth(new Date())
+    const fimMes = endOfMonth(new Date())
+    const { data } = await supabase
+      .from('marcacoes')
+      .select('*')
+      .eq('user_id', user.id)
+      .gte('created_at', inicioMes.toISOString())
+      .lte('created_at', fimMes.toISOString())
+      .order('created_at', { ascending: true })
+    setMarcacoesMes((data as Marcacao[]) || [])
+  }, [supabase, user.id])
+
   useEffect(() => {
     carregarMarcacoes()
+    carregarMarcacoesMes()
     const tick = setInterval(() => setAgora(new Date()), 1000)
     return () => clearInterval(tick)
-  }, [carregarMarcacoes])
+  }, [carregarMarcacoes, carregarMarcacoesMes])
 
   async function baterPonto() {
     setLoading(true)
@@ -50,6 +65,7 @@ export default function ColaboradorDashboard({ user }: { user: User }) {
     } else {
       setMsg(tipo === 'entrada' ? 'Entrada registrada com sucesso.' : 'Saída registrada com sucesso.')
       await carregarMarcacoes()
+      await carregarMarcacoesMes()
     }
     setLoading(false)
     setTimeout(() => setMsg(''), 3000)
@@ -57,6 +73,38 @@ export default function ColaboradorDashboard({ user }: { user: User }) {
 
   const ultimaMarcacao = marcacoes[marcacoes.length - 1]
   const proximoTipo = !ultimaMarcacao || ultimaMarcacao.tipo === 'saida' ? 'entrada' : 'saida'
+
+  function calcularHorasMes() {
+    let totalMinutos = 0
+    let totalDias = 0
+    const porDia: Record<string, Marcacao[]> = {}
+    for (const m of marcacoesMes) {
+      const dia = format(new Date(m.created_at), 'yyyy-MM-dd')
+      if (!porDia[dia]) porDia[dia] = []
+      porDia[dia].push(m)
+    }
+    totalDias = Object.keys(porDia).length
+    for (const diaLista of Object.values(porDia)) {
+      for (let i = 0; i < diaLista.length - 1; i++) {
+        if (diaLista[i].tipo === 'entrada' && diaLista[i + 1].tipo === 'saida') {
+          totalMinutos += differenceInMinutes(
+            new Date(diaLista[i + 1].created_at),
+            new Date(diaLista[i].created_at)
+          )
+          i++
+        }
+      }
+    }
+    return { totalMinutos, totalDias }
+  }
+
+  function formatarHoras(min: number) {
+    const h = Math.floor(min / 60)
+    const m = min % 60
+    return `${h}h ${String(m).padStart(2, '0')}min`
+  }
+
+  const { totalMinutos, totalDias } = calcularHorasMes()
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#f4f4f5' }}>
@@ -108,6 +156,21 @@ export default function ColaboradorDashboard({ user }: { user: User }) {
               última: {format(new Date(ultimaMarcacao.created_at), 'HH:mm')}
             </span>
           )}
+        </div>
+
+        {/* Horas trabalhadas no mês */}
+        <div className="rounded-2xl border p-5" style={{ background: '#ffffff', borderColor: '#e4e4e7' }}>
+          <h2 className="font-semibold text-zinc-800 text-sm mb-3">
+            Horas trabalhadas — {format(agora, "MMMM 'de' yyyy", { locale: ptBR })}
+          </h2>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-bold" style={{ color: '#7B2D6E' }}>
+              {formatarHoras(totalMinutos)}
+            </span>
+            <span className="text-sm text-zinc-400">
+              em {totalDias} {totalDias === 1 ? 'dia' : 'dias'}
+            </span>
+          </div>
         </div>
 
         {/* Marcações do dia */}
