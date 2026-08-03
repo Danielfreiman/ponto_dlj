@@ -21,7 +21,12 @@ export async function GET() {
 
     const usuarios = data.users
       .filter(u => u.email !== MASTER_EMAIL)
-      .map(u => ({ id: u.id, email: u.email, created_at: u.created_at }))
+      .map(u => ({
+        id: u.id,
+        email: u.email,
+        nome: typeof u.user_metadata?.nome === 'string' ? u.user_metadata.nome : undefined,
+        created_at: u.created_at,
+      }))
 
     return NextResponse.json({ usuarios })
   } catch (err) {

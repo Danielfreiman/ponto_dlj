@@ -20,11 +20,13 @@ interface Marcacao {
 interface Usuario {
   id: string
   email: string
+  nome?: string
 }
 
 interface ColaboradorResumo {
   email: string
   totalMinutos: number
+  totalMinutosExtras: number | null
   totalDias: number
   marcacoes: Marcacao[]
 }
@@ -34,7 +36,10 @@ interface GrupoDia {
   dia: string
   entrada?: Marcacao
   saida?: Marcacao
+  minutosExtrasDia?: number | null
 }
+
+const JORNADA_DIARIA_ALICE_MINUTOS = 6 * 60 + 30
 
 export default function MasterDashboard({ user }: { user: User }) {
   const [mes, setMes] = useState(format(new Date(), 'yyyy-MM'))
@@ -72,6 +77,36 @@ export default function MasterDashboard({ user }: { user: User }) {
   useEffect(() => { carregarDados() }, [carregarDados])
   useEffect(() => { carregarUsuarios() }, [carregarUsuarios])
 
+  function ehAlice(userId: string, email: string) {
+    const usuario = usuarios.find(u => u.id === userId)
+    const primeiroNome = usuario?.nome
+      ?.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)[0]
+    const nomeNoEmail = email.split('@')[0].toLowerCase()
+
+    return primeiroNome === 'alice' || nomeNoEmail.startsWith('alice')
+  }
+
+  function calcularMinutosTrabalhados(lista: Marcacao[]) {
+    let totalMinutos = 0
+    const ordenada = [...lista].sort((a, b) => a.created_at.localeCompare(b.created_at))
+
+    for (let i = 0; i < ordenada.length - 1; i++) {
+      if (ordenada[i].tipo === 'entrada' && ordenada[i + 1].tipo === 'saida') {
+        totalMinutos += differenceInMinutes(
+          new Date(ordenada[i + 1].created_at),
+          new Date(ordenada[i].created_at)
+        )
+        i++
+      }
+    }
+
+    return totalMinutos
+  }
+
   function calcularResumos(): ColaboradorResumo[] {
     const porEmail: Record<string, Marcacao[]> = {}
     for (const m of marcacoes) {
@@ -80,6 +115,7 @@ export default function MasterDashboard({ user }: { user: User }) {
     }
     return Object.entries(porEmail).map(([email, lista]) => {
       let totalMinutos = 0
+      let totalMinutosExtras = 0
       const dias = new Set<string>()
       const porDia: Record<string, Marcacao[]> = {}
       for (const m of lista) {
@@ -89,17 +125,21 @@ export default function MasterDashboard({ user }: { user: User }) {
         dias.add(dia)
       }
       for (const diaLista of Object.values(porDia)) {
-        for (let i = 0; i < diaLista.length - 1; i++) {
-          if (diaLista[i].tipo === 'entrada' && diaLista[i + 1].tipo === 'saida') {
-            totalMinutos += differenceInMinutes(
-              new Date(diaLista[i + 1].created_at),
-              new Date(diaLista[i].created_at)
-            )
-            i++
-          }
+        const minutosDia = calcularMinutosTrabalhados(diaLista)
+        totalMinutos += minutosDia
+
+        if (ehAlice(diaLista[0].user_id, email)) {
+          totalMinutosExtras += Math.max(0, minutosDia - JORNADA_DIARIA_ALICE_MINUTOS)
         }
       }
-      return { email, totalMinutos, totalDias: dias.size, marcacoes: lista }
+      const colaboradoraEhAlice = lista.some(m => ehAlice(m.user_id, email))
+      return {
+        email,
+        totalMinutos,
+        totalMinutosExtras: colaboradoraEhAlice ? totalMinutosExtras : null,
+        totalDias: dias.size,
+        marcacoes: lista,
+      }
     })
   }
 
@@ -118,20 +158,42 @@ export default function MasterDashboard({ user }: { user: User }) {
     for (const chave of Object.keys(porEmailDia)) {
       const [email, dia] = chave.split('|')
       const lista = [...porEmailDia[chave]].sort((a, b) => a.created_at.localeCompare(b.created_at))
+      const minutosDia = calcularMinutosTrabalhados(lista)
+      const minutosExtrasDia = ehAlice(lista[0].user_id, email)
+        ? Math.max(0, minutosDia - JORNADA_DIARIA_ALICE_MINUTOS)
+        : null
       let i = 0
+      let primeiroRegistroDoDia = true
       while (i < lista.length) {
         if (lista[i].tipo === 'entrada') {
           if (i + 1 < lista.length && lista[i + 1].tipo === 'saida') {
-            grupos.push({ email, dia, entrada: lista[i], saida: lista[i + 1] })
+            grupos.push({
+              email,
+              dia,
+              entrada: lista[i],
+              saida: lista[i + 1],
+              minutosExtrasDia: primeiroRegistroDoDia ? minutosExtrasDia : undefined,
+            })
             i += 2
           } else {
-            grupos.push({ email, dia, entrada: lista[i] })
+            grupos.push({
+              email,
+              dia,
+              entrada: lista[i],
+              minutosExtrasDia: primeiroRegistroDoDia ? minutosExtrasDia : undefined,
+            })
             i += 1
           }
         } else {
-          grupos.push({ email, dia, saida: lista[i] })
+          grupos.push({
+            email,
+            dia,
+            saida: lista[i],
+            minutosExtrasDia: primeiroRegistroDoDia ? minutosExtrasDia : undefined,
+          })
           i += 1
         }
+        primeiroRegistroDoDia = false
       }
     }
 
@@ -290,6 +352,20 @@ export default function MasterDashboard({ user }: { user: User }) {
                     <span className="w-2 h-2 rounded-full" style={{ background: '#7B2D6E' }} />
                     <span className="text-xs text-zinc-500">{r.marcacoes.length} marcações no mês</span>
                   </div>
+                  {r.totalMinutosExtras !== null && (
+                    <div className="mt-3 rounded-xl p-3" style={{ background: '#fdf4ff' }}>
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-zinc-500">Jornada diária da Alice</span>
+                        <span className="text-sm font-semibold text-zinc-700">6h 30min</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 mt-1.5">
+                        <span className="text-xs text-zinc-500">Horas extras no mês</span>
+                        <span className="text-sm font-bold" style={{ color: '#7B2D6E' }}>
+                          {formatarHoras(r.totalMinutosExtras)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -322,13 +398,14 @@ export default function MasterDashboard({ user }: { user: User }) {
                     <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Entrada</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Saída</th>
                     <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Horas</th>
+                    <th className="px-5 py-3 text-left text-xs font-semibold text-zinc-500 uppercase tracking-wider">Extra do dia</th>
                     <th className="px-5 py-3 text-right text-xs font-semibold text-zinc-500 uppercase tracking-wider">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ borderColor: '#f4f4f5' }}>
                   {detalhadoFiltrado.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-10 text-zinc-400 text-sm">
+                      <td colSpan={7} className="text-center py-10 text-zinc-400 text-sm">
                         {filtroEmail ? 'Nenhuma marcação para este colaborador no período.' : 'Nenhuma marcação no período.'}
                       </td>
                     </tr>
@@ -393,6 +470,11 @@ export default function MasterDashboard({ user }: { user: User }) {
                           )}
                         </td>
                         <td className="px-5 py-3 text-zinc-700 font-medium">{horas}</td>
+                        <td className="px-5 py-3 text-zinc-700 font-medium">
+                          {g.minutosExtrasDia === null || g.minutosExtrasDia === undefined
+                            ? '—'
+                            : formatarHoras(g.minutosExtrasDia)}
+                        </td>
                         <td className="px-5 py-3 text-right">
                           {!g.entrada || !g.saida ? (
                             <span
